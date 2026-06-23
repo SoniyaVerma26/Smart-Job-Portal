@@ -15,20 +15,21 @@ export interface Profile {
 export type JobType = 'full-time' | 'part-time' | 'remote' | 'contract' | 'internship';
 
 export interface Job {
-  id: string;
-  recruiter_id: string;
+  id: string | number;
+  recruiter_id?: string;
   title: string;
   company: string;
   location: string;
-  type: JobType;
-  salary_min: number;
-  salary_max: number;
+  type?: JobType | string;
+  salary?: string;
+  salary_min?: number;
+  salary_max?: number;
   description: string;
-  requirements: string[];
-  skills: string[];
-  category: string;
-  is_active: boolean;
-  created_at: string;
+  requirements?: string[];
+  skills?: string | string[];
+  category?: string;
+  is_active?: boolean;
+  created_at?: string;
 }
 
 export type ApplicationStatus = 'applied' | 'reviewing' | 'interview' | 'rejected' | 'offered';

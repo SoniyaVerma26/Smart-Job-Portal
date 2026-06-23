@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, FileText, X, Plus, Save, Briefcase } from 'lucide-react';
+import { getAuthHeader } from '../lib/api';
+
+const API_BASE_URL = 'http://localhost:8080';
 
 export default function ProfilePage() {
   const { profile, updateProfile, user } = useAuth();
@@ -14,20 +17,131 @@ export default function ProfilePage() {
   const [newSkill, setNewSkill] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [resumeUrl, setResumeUrl] = useState(profile?.resume_url || '');
+  const [uploading, setUploading] = useState(false);
+
+
+  const handleResumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setResumeFile(file);
+      console.log("Resume file selected:", file.name, "Size:", file.size);
+    }
+  };
+
+  const uploadResumeToBackend = async (file: File): Promise<string | null> => {
+    try {
+      setUploading(true);
+      if (!user) {
+        alert('Not authenticated');
+        return null;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`${API_BASE_URL}/users/${user.id}/resume`, {
+        method: 'POST',
+        headers: {
+          ...getAuthHeader(),
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        console.error('Upload error:', data);
+        alert(data.message || 'Failed to upload resume');
+        return null;
+      }
+
+      const resumeUrl = data.resume_url ?? data.user?.resume_url;
+      if (!resumeUrl) {
+        alert('Upload response missing resume URL');
+        return null;
+      }
+
+      setResumeFile(null);
+      return resumeUrl;
+    } catch (err) {
+      console.error('Resume upload error:', err);
+      alert('Error uploading resume');
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await updateProfile({
-      full_name: fullName,
-      phone,
-      company,
-      skills,
-    });
-    setSaving(false);
-    if (!error) {
-      setEditing(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+    try {
+      let finalResumeUrl = resumeUrl;
+
+      // Upload resume if a new file is selected
+      if (resumeFile) {
+        const uploadedUrl = await uploadResumeToBackend(resumeFile);
+        if (uploadedUrl) {
+          finalResumeUrl = uploadedUrl;
+          setResumeUrl(uploadedUrl);
+          console.log("Resume URL set to:", uploadedUrl);
+        } else {
+          setSaving(false);
+          return; // Upload failed, don't save
+        }
+      }
+
+      // Update profile via backend endpoint
+      if (!user) {
+        setSaving(false);
+        alert('Not authenticated');
+        return;
+      }
+
+      console.log("=== SAVE PROFILE ===");
+      console.log("UserId:", user.id);
+      console.log("Resume URL being saved:", finalResumeUrl);
+
+      const response = await fetch(`http://localhost:8080/users/${user.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader(),
+        },
+        body: JSON.stringify({
+          full_name: fullName,
+          phone,
+          company,
+          skills,
+          resume_url: finalResumeUrl,
+        }),
+      });
+
+      const data = await response.json();
+      console.log("Save response:", data);
+
+      if (data.success) {
+        // Update local profile with saved data
+        if (data.user) {
+          updateProfile({
+            full_name: data.user.name || fullName,
+            phone: data.user.phone || phone,
+            company: data.user.company || company,
+            skills: typeof data.user.skills === 'string' ? data.user.skills.split(',') : data.user.skills,
+            resume_url: data.user.resume_url || finalResumeUrl,
+          });
+        }
+        setEditing(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      } else {
+        alert(data.message || 'Failed to save profile');
+      }
+    } catch (err) {
+      console.error('Save error:', err);
+      alert('Error saving profile');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -41,6 +155,14 @@ export default function ProfilePage() {
   const removeSkill = (skill: string) => {
     setSkills(skills.filter(s => s !== skill));
   };
+
+  useEffect(() => {
+    setFullName(profile?.full_name || '');
+    setPhone(profile?.phone || '');
+    setCompany(profile?.company || '');
+    setSkills(profile?.skills || []);
+    setResumeUrl(profile?.resume_url || '');
+  }, [profile]);
 
   if (!user) {
     navigate('/login');
@@ -185,16 +307,34 @@ export default function ProfilePage() {
               <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />
               {editing ? (
                 <>
-                  <p className="text-sm text-gray-600">Upload your resume (PDF)</p>
+                  <p className="text-sm text-gray-600">
+                    {resumeFile ? `Selected: ${resumeFile.name}` : 'Upload your resume (PDF)'}
+                  </p>
                   <input
                     type="file"
                     accept=".pdf"
-                    className="mt-2 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    onChange={handleResumeChange}
+                    disabled={uploading}
+                    className="mt-2 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
                   />
+                  {resumeUrl && (
+                    <p className="text-xs text-emerald-600 mt-2">
+                      ✓ Current resume: {resumeUrl.split('/').pop()}
+                    </p>
+                  )}
                 </>
               ) : (
                 <p className="text-sm text-gray-500">
-                  {profile?.resume_url ? 'Resume uploaded' : 'No resume uploaded'}
+                  {resumeUrl ? (
+                    <>
+                      ✓ Resume uploaded<br />
+                      <a href={resumeUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs">
+                        View Resume
+                      </a>
+                    </>
+                  ) : (
+                    'No resume uploaded'
+                  )}
                 </p>
               )}
             </div>

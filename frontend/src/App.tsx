@@ -11,6 +11,7 @@ import ProfilePage from './pages/ProfilePage';
 
 import SeekerDashboard from './pages/seeker/SeekerDashboard';
 import AppliedJobsPage from './pages/seeker/AppliedJobsPage';
+import MyApplicationsPage from './pages/seeker/MyApplicationsPage';
 import SavedJobsPage from './pages/seeker/SavedJobsPage';
 
 import RecruiterDashboard from './pages/recruiter/RecruiterDashboard';
@@ -37,6 +38,7 @@ function AppRoutes() {
       <Route element={<DashboardLayout requiredRole="job_seeker" />}>
         <Route path="/seeker/dashboard" element={<SeekerDashboard />} />
         <Route path="/seeker/applied" element={<AppliedJobsPage />} />
+        <Route path="/seeker/applications" element={<MyApplicationsPage />} />
         <Route path="/seeker/saved" element={<SavedJobsPage />} />
       </Route>
 

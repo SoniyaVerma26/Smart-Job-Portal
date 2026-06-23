@@ -9,7 +9,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const { loginWithBackend } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -20,12 +20,59 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
-    const { error } = await signIn(email, password);
-    setLoading(false);
-    if (error) {
-      setError(error);
-    } else {
-      navigate('/');
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) {
+        // invalid credentials or other errors
+        setLoading(false);
+        alert('Invalid credentials');
+        return;
+      }
+      const data = await res.json();
+      // expected backend format: { success: true, message, user: { id, name, email, role, phone, skills } }
+      if (!data.success) {
+        setLoading(false);
+        alert(data.message ?? 'Invalid credentials');
+        return;
+      }
+      // persist the exact backend response mapping to localStorage
+      try {
+        localStorage.setItem('backendAuth', JSON.stringify(data));
+      } catch (e) {
+        // ignore storage errors
+      }
+
+      const u = data.user ?? {};
+      const backendUser = { id: String(u.id ?? ''), email: u.email ?? email };
+      const backendProfile = {
+        id: String(u.id ?? backendUser.id),
+        full_name: u.name ?? '',
+        phone: u.phone ?? '',
+        role: u.role ?? (u.role as any),
+        skills: typeof u.skills === 'string' ? u.skills.split(',').map((s: string) => s.trim()) : Array.isArray(u.skills) ? u.skills : [],
+        resume_url: u.resume_url ?? '',
+        company: u.company ?? '',
+        avatar_url: u.avatar_url ?? '',
+        created_at: u.created_at ?? new Date().toISOString(),
+      };
+      loginWithBackend(backendUser, backendProfile, data.token);
+      setLoading(false);
+      // map backend role values to frontend routes
+      const roleRaw = (data.user?.role ?? backendProfile.role) as string | undefined;
+      if (roleRaw === 'JOB_SEEKER') {
+        navigate('/seeker/dashboard');
+      } else if (roleRaw === 'RECRUITER') {
+        navigate('/recruiter/dashboard');
+      } else {
+        navigate('/');
+      }
+    } catch (err: any) {
+      setLoading(false);
+      setError(err?.message ?? 'An unexpected error occurred');
     }
   };
 

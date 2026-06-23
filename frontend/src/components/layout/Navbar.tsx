@@ -10,7 +10,7 @@ export default function Navbar() {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/');
+    navigate('/login');
   };
 
   const dashboardPath = profile?.role === 'recruiter' ? '/recruiter/dashboard' : '/seeker/dashboard';

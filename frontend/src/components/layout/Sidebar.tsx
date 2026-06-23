@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Briefcase, FileText, Bookmark, User,
-  PlusCircle, Users, Settings
+  PlusCircle, Users, Settings, Send
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -11,6 +11,7 @@ interface SidebarProps {
 const seekerLinks = [
   { to: '/seeker/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/jobs', label: 'Browse Jobs', icon: Briefcase },
+  { to: '/seeker/applications', label: 'My Applications', icon: Send },
   { to: '/seeker/applied', label: 'Applied Jobs', icon: FileText },
   { to: '/seeker/saved', label: 'Saved Jobs', icon: Bookmark },
   { to: '/profile', label: 'Profile', icon: User },
